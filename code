@@ -1,0 +1,237 @@
+from cmu_graphics import * 
+import random, copy
+
+class Bar: 
+    def __init__(self, height):
+        self.height = height
+    
+    def __repr__(self): 
+        return f'{self.height}'
+    
+    def __eq__(self, other): 
+        return isinstance(other, Bar) and self.height == other.height
+
+class barGroup: 
+    def __init__(self, heightList):
+        self.sortedBars = [] 
+        for height in heightList: 
+            self.sortedBars.append(Bar(height))
+        self.shuffledBars = copy.deepcopy(self.sortedBars)
+        random.shuffle(self.shuffledBars)
+        
+    def getMaxLeft(self, app): 
+        maxHeight = app.bars.shuffledBars[0].height
+        maxLeft = 356 - app.totalCanvasWidth / 2 
+        gap = app.barWidth + app.gapWidth  
+        maxIndex = 0 
+        
+        #make the last comparison after app.steps reach the maxIndex 
+        if app.countSteps >= app.maxSteps + 2: 
+            comparisons = app.maxSteps + 1 
+        else: 
+            comparisons = app.steps 
+        
+        #find the max 
+        for i in range(comparisons): 
+            currHeight = app.bars.shuffledBars[i].height 
+            if currHeight > maxHeight: 
+                maxHeight = currHeight 
+                maxLeft = 356 - app.totalCanvasWidth / 2 + i * gap 
+                maxIndex = i 
+       
+        return maxLeft, maxIndex 
+    
+    def updateShuffledBars(self, app): 
+        maxLeft, maxIndex = self.getMaxLeft(app)
+        lastHeight = self.shuffledBars[app.steps].height 
+        maxHeight = self.shuffledBars[maxIndex].height 
+        self.shuffledBars[maxIndex].height = lastHeight 
+        self.shuffledBars[app.steps].height = maxHeight 
+    
+def onAppStart(app): 
+    app.numOfBars = 10
+    app.totalHeight = 133
+    newSort(app)
+    changeSpeed(app)
+
+def newSort(app): 
+    setDimensions(app)
+    initialHeightList = setBarGroup(app)
+    app.bars = barGroup(initialHeightList)
+    app.comparisons = 0 
+    app.copies = 0 
+    app.run = False 
+    app.pause = True 
+    app.steps = 0
+    app.fastMode = False 
+    app.newSize = False 
+    app.newNumOfBars = ''
+    app.maxSteps = len(initialHeightList) - 1
+    app.tempHeight = 0.0001
+    app.maxIndex = app.bars.shuffledBars[0].height
+    app.countSteps = 0 
+    app.sortedIndexes = [] 
+    app.finishedSort = False
+    app.selected = [] 
+
+def setDimensions(app): 
+    #reset the dimensions based on new # of bars 
+    increaseRate = 11
+    if app.numOfBars > 24: 
+        increaseRate = 8
+    app.totalCanvasWidth = 280 + app.numOfBars * increaseRate
+    app.barWidth = 3 * (app.totalCanvasWidth / (5 * app.numOfBars - 2))
+    app.heightDiff = app.totalHeight / app.numOfBars
+    app.gapWidth = app.barWidth * 2/3
+    app.maxSteps = app.numOfBars - 1
+    
+def setBarGroup(app): 
+    heightList = [] 
+    setDimensions(app)
+    for i in range(app.numOfBars): 
+        height = app.heightDiff + i*app.heightDiff
+        heightList.append(height)
+    #reset the bargroup based on new changes in the size 
+    app.bars = barGroup(heightList)
+    return heightList
+
+def redrawAll(app): 
+    drawLabels(app)
+    drawBars(app)
+    
+def drawLabels(app): 
+    drawLabel('Visual Selection Sort', 360, 70, size=32, font = 'Caveat font')
+    drawRect(80, 100, 560, 400, border = 'darkOliveGreen', fill = 'snow', borderWidth = 1)
+    drawLabel('Temp',360, 484, bold = True)
+    
+    #options menu
+    for i in range(6):
+        color = 'darkgrey' if i in app.selected else 'lightgray'
+        drawRect(696, 100 + i*67, 80, 50, fill = color)
+    drawLabel('New Sort', 736, 125)
+    drawLabel('Run', 736, 191)
+    drawLabel('Pause', 736, 258)
+    drawLabel('Step', 736, 325)
+    drawLabel('Fast Mode', 736, 391)
+    drawLabel('New Size', 736, 458)
+    
+    #newSize 
+    if app.newSize: 
+        drawLabel(f'New Size:{app.newNumOfBars}', 725, 503)
+        drawLabel(f'New Size:{app.newNumOfBars}', 725, 503)
+        drawLabel('Please enter numbers to input the new size; then click enter to enact the change (maximum size of 32)', 505, 523)
+        
+    #comparisons and copies count 
+    drawLabel(f'Comparisons: {app.comparisons}', 735, 560)
+    drawLabel(f'Copies: {app.copies}', 751, 580)
+    
+def drawBars(app): 
+    #draw bars  
+    maxLeft, maxIndex = app.bars.getMaxLeft(app) 
+    gap = app.barWidth + app.gapWidth 
+    for i in range(len(app.bars.shuffledBars)): 
+        bar = app.bars.shuffledBars[i] 
+        if app.countSteps == app.maxSteps + 3 and i == maxIndex: 
+            drawRect(360 - app.totalCanvasWidth / 2 + i*gap, 300, app.barWidth, 0.1, 
+                    fill = 'white', align = 'bottom-left')
+        elif i in app.sortedIndexes: 
+            drawRect(360 - app.totalCanvasWidth / 2 + i*gap, 300, app.barWidth, bar.height, 
+                    fill = 'black', align = 'bottom-left')
+        else: 
+            drawRect(360 - app.totalCanvasWidth / 2 + i*gap, 300, app.barWidth, bar.height, 
+                    fill = 'lightblue', align = 'bottom-left')
+    
+    #comparison boxes
+    if not app.finishedSort: 
+        if app.countSteps > 0: 
+            drawRect(maxLeft, 306, app.barWidth + 8, 200, fill = None, border = 'green', align = 'bottom-left')
+            drawLabel('max', maxLeft + 4, 316, align = 'bottom-left')
+            drawRect(356 - app.totalCanvasWidth / 2 + app.steps * gap, 306, app.barWidth + 8, 200, fill = None, border = 'green', align = 'bottom-left')
+    
+    #temp bar
+    drawRect(340, 457, 40, app.tempHeight, align = 'bottom-left')
+
+def onMousePress(app, mouseX, mouseY): 
+    if mouseX >= 696 and mouseX <= 776: 
+        if mouseY >= 100 and mouseY <= 150: #newSort
+            newSort(app) 
+        elif mouseY >= 167 and mouseY <= 217: #run 
+            app.selected = [1]
+            app.run = not app.run
+        elif mouseY >= 234 and mouseY <= 284: #pause 
+            app.selected = [2]
+            app.run = False 
+        elif mouseY >= 301 and mouseY <= 351: #step 
+            app.selected = [3]
+            app.run = False
+            takeStep(app)  
+        elif mouseY >= 368 and mouseY <= 418: #fast mode 
+            app.fastMode = not app.fastMode 
+            changeSpeed(app)
+            if app.fastMode: 
+                app.selected.append(4)
+            else: 
+                if 4 in app.selected: 
+                    index = app.selected.index(4)
+                    app.selected.pop(index)
+        elif mouseY >= 435 and mouseY <= 485: #newSize 
+            app.selected = [5]
+            app.newSize = True 
+            app.newNumOfBars = ''
+            app.run =  False
+
+def changeSpeed(app): 
+    app.stepsPerSecond = 15 if app.fastMode else 5 
+    
+def checkSort(app): 
+    if len(app.sortedIndexes) == len(app.bars.shuffledBars): 
+        app.finishedSort = True 
+            
+def onKeyPress(app, key): 
+    if app.newSize: 
+        if key.isdigit(): 
+            app.newNumOfBars += key
+        elif key == 'backspace': 
+            app.newNumOfBars = app.newNumOfBars[ :-1] 
+        elif key == 'enter' and len(app.newNumOfBars) and int(app.newNumOfBars) <= 32 : 
+            app.numOfBars = int(app.newNumOfBars)
+            app.newSize = False 
+            app.sortedIndexes = []
+            app.steps = 0 
+            app.countSteps = 0
+            app.comparisons = 0 
+            app.copies = 0 
+            setBarGroup(app) 
+        elif key == 'enter' and int(app.newNumOfBars) > 32:
+            app.newNumOfBars = ''
+
+def onStep(app): 
+    if app.run: 
+        takeStep(app)
+
+def takeStep(app): 
+    if not app.finishedSort: 
+        app.countSteps += 1 #counts how many times steps button is clicked 
+    if app.countSteps > 1: #start sort after the initial press on step 
+        if app.steps < app.maxSteps: 
+            app.steps += 1
+            app.comparisons += 1
+        elif app.countSteps - 2 == app.maxSteps: #make the last comparison 
+            app.comparisons += 1
+        elif app.countSteps == app.maxSteps + 3:  #make the copy 
+            maxLeft, maxIndex = app.bars.getMaxLeft(app)
+            app.tempHeight = app.bars.shuffledBars[maxIndex].height
+            app.copies += 1
+        elif app.countSteps == app.maxSteps + 4:   #start sorting from the beginning again 
+            app.sortedIndexes.append(app.steps)
+            app.bars.updateShuffledBars(app)
+            checkSort(app) 
+            app.maxSteps -= 1 
+            app.steps = 0
+            app.countSteps = 1 
+            app.tempHeight = 0.0001
+    
+def main():
+    runApp(width=800, height=600)
+
+main()
